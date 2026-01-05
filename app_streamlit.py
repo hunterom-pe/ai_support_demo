@@ -1,33 +1,29 @@
 import streamlit as st
-import subprocess
 import json
 import math
 
 # ------------------------
-# Load documents
+# Load demo tickets
 # ------------------------
 def load_documents():
-    with open("customer_data.txt", "r") as file:
-        return [line.strip() for line in file if line.strip()]
+    # Pre-filled sample tickets
+    return [
+        "Ticket: The iOS app crashes immediately when I try to log in.",
+        "Ticket: I've emailed twice already and no one has responded.",
+        "Ticket: I was charged twice for my March invoice and no one has fixed it.",
+        "Ticket: The website is loading very slowly for me.",
+        "Ticket: I received the wrong item in my order and need a replacement."
+    ]
 
 # ------------------------
-# Embeddings (safe)
+# Fake embeddings for demo
 # ------------------------
 def embed(text):
-    try:
-        result = subprocess.run(
-            ["ollama", "run", "nomic-embed-text"],
-            input=text,
-            text=True,
-            capture_output=True
-        )
-        return json.loads(result.stdout)["embedding"]
-    except Exception:
-        # fallback embedding if Ollama fails
-        return [0.0] * 768
+    # Fixed vector for cosine similarity demo
+    return [0.1] * 768
 
 # ------------------------
-# Cosine similarity (zero-safe)
+# Cosine similarity (safe)
 # ------------------------
 def cosine_similarity(a, b):
     dot = sum(x*y for x, y in zip(a, b))
@@ -50,33 +46,25 @@ def retrieve_relevant_docs(query, documents, top_k=3):
     return [doc for _, doc in scored[:top_k]]
 
 # ------------------------
-# Build AI prompt
-# ------------------------
-def build_prompt(context):
-    return f"""
-You are a senior customer support specialist.
-
-Relevant customer context:
-{context}
-
-Return ONLY valid JSON with:
-- issue_summary
-- customer_sentiment
-- draft_reply
-- recommended_actions
-"""
-
-# ------------------------
-# Call LLM
+# Fake AI response for demo
 # ------------------------
 def call_llm(prompt):
-    result = subprocess.run(
-        ["ollama", "run", "mistral"],
-        input=prompt,
-        text=True,
-        capture_output=True
-    )
-    return result.stdout
+    return json.dumps({
+        "issue_summary": [
+            "The customer reports login crashes and billing issues."
+        ],
+        "customer_sentiment": "Frustrated",
+        "draft_reply": (
+            "Dear Customer, we are investigating your issue. "
+            "Regarding the app crash, our engineers are working on a fix. "
+            "For billing concerns, our support team will resolve the double charge promptly."
+        ),
+        "recommended_actions": [
+            "Fix the app crash issue",
+            "Resolve the double charge",
+            "Follow up with the customer to ensure satisfaction"
+        ]
+    })
 
 # ------------------------
 # Streamlit UI
@@ -84,21 +72,21 @@ def call_llm(prompt):
 st.set_page_config(page_title="AI Customer Support Demo", page_icon="🤖", layout="wide")
 
 # --- Title & intro ---
-st.title("🤖 AI-Powered Customer Support Assistant")
+st.title("🤖 AI-Powered Customer Support Assistant (Demo)")
 st.markdown("""
 This demo shows how AI can automatically retrieve relevant customer data and draft structured responses.
-Use the input below to simulate a customer issue.
+All data and AI outputs are **simulated** for demonstration purposes.
 """)
 
-# --- Metrics / stats ---
+# --- Demo metrics ---
 st.subheader("⏱ Demo Stats")
-st.metric(label="Tickets Processed", value="100", delta="Processed in 3s")
-st.metric(label="AI Accuracy (simulated)", value="95%", delta="Compared to manual review")
+st.metric(label="Tickets Processed", value="100", delta="Processed instantly")
+st.metric(label="AI Accuracy (simulated)", value="95%", delta="High accuracy for demo")
 st.markdown("---")
 
-# --- Business value paragraph ---
+# --- Why this matters ---
 st.markdown("""
-### 📌 Why this matters to business
+### 📌 Why this matters
 Customer support teams spend hours reading tickets and notes.  
 This AI assistant:
 - Automatically finds the most relevant context
@@ -109,14 +97,14 @@ This demo shows the **potential of AI integration** in real-world customer suppo
 """)
 st.markdown("---")
 
-# --- Step 1: Show original tickets ---
+# --- Show demo tickets ---
 st.subheader("📄 Customer Tickets / Notes")
 documents = load_documents()
 for doc in documents:
     st.markdown(f"- {doc}")
 st.markdown("---")
 
-# --- Step 2: Input query ---
+# --- Input query ---
 st.subheader("📝 Enter Customer Issue")
 sample_issues = [
     "Customer is upset about billing and lack of response",
@@ -148,9 +136,9 @@ if st.button("Run AI"):
         )
 
     with col2:
-        # Build prompt & get AI output
+        # Build a fake prompt (just for demo)
         context = "\n".join(relevant_docs)
-        prompt = build_prompt(context)
+        prompt = f"Simulated prompt based on context:\n{context}"
         response = call_llm(prompt)
 
         # --- Parse JSON safely ---
@@ -180,9 +168,9 @@ if st.button("Run AI"):
 - { '\n- '.join(response_json.get('recommended_actions', [])) }
 """)
 
-        # --- Structured JSON output + copy/download ---
+        # --- Structured JSON + copy/download ---
         st.subheader("💡 AI Output (Structured JSON)")
-        st.text_area("Copy AI Output", value=response, height=200, key="copy_output")
+        st.text_area("Copy AI Output", value=json.dumps(response_json, indent=2), height=200, key="copy_output")
 
         st.download_button(
             label="📥 Download AI Output as JSON",
