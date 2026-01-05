@@ -24,6 +24,7 @@ if "sentiment_history" not in st.session_state:
 # Fake embeddings / AI
 # ------------------------
 def embed(text):
+    # Fake embedding for demo
     return [0.1] * 768
 
 def cosine_similarity(a, b):
@@ -41,6 +42,7 @@ def retrieve_relevant_tickets(query, tickets, top_k=3):
     return [t for _, t in scored[:top_k]]
 
 def call_llm(prompt):
+    # Fake AI response for demo
     sentiment = random.choice(["Frustrated", "Upset", "Concerned"])
     st.session_state.sentiment_history.append(sentiment)
     return json.dumps({
@@ -153,15 +155,7 @@ if st.button("Run AI"):
     with col2:
         prompt = "\n".join([t["issue"] for t in relevant_tickets])
         response = call_llm(prompt)
-        try:
-            response_json = json.loads(response)
-        except json.JSONDecodeError:
-            response_json = {
-                "issue_summary": ["Failed to parse JSON."],
-                "customer_sentiment": "Unknown",
-                "draft_reply": response,
-                "recommended_actions": []
-            }
+        response_json = json.loads(response)
 
         st.subheader("💬 AI Summary / Draft Reply")
         st.markdown(
@@ -188,10 +182,11 @@ if st.button("Run AI"):
 
     # --- AI Sentiment Chart ---
     st.subheader("📊 AI Customer Sentiment (Simulation)")
-    sentiment_counts = pd.Series(st.session_state.sentiment_history).value_counts().reset_index()
-    sentiment_counts.columns = ["Sentiment", "Count"]
-    fig_sentiment = px.bar(sentiment_counts, x="Sentiment", y="Count", color="Sentiment",
-                           color_discrete_map={"Frustrated":"#EF5350","Upset":"#FFA726","Concerned":"#29B6F6"})
-    st.plotly_chart(fig_sentiment, use_container_width=True)
+    if st.session_state.sentiment_history:
+        sentiment_counts = pd.Series(st.session_state.sentiment_history).value_counts().reset_index()
+        sentiment_counts.columns = ["Sentiment", "Count"]
+        fig_sentiment = px.bar(sentiment_counts, x="Sentiment", y="Count", color="Sentiment",
+                               color_discrete_map={"Frustrated":"#EF5350","Upset":"#FFA726","Concerned":"#29B6F6"})
+        st.plotly_chart(fig_sentiment, use_container_width=True)
 
     st.success("Demo complete! Update tickets above or enter another issue to try again.")
