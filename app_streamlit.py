@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 
 # ------------------------
-# Stateful tickets
+# Stateful tickets & history
 # ------------------------
 if "tickets" not in st.session_state:
     st.session_state.tickets = [
@@ -24,7 +24,6 @@ if "sentiment_history" not in st.session_state:
 # Fake embeddings / AI
 # ------------------------
 def embed(text):
-    # Always return a fixed-length embedding
     if not text:
         return [0.0] * 768
     return [0.1] * 768
@@ -48,30 +47,37 @@ def retrieve_relevant_tickets(query, tickets, top_k=3):
             doc_embedding = [0.0] * len(query_embedding)
         score = cosine_similarity(query_embedding, doc_embedding)
         scored.append((score, t))
-    scored.sort(reverse=True, key=lambda x: x[0])  # sort by similarity
+    scored.sort(reverse=True, key=lambda x: x[0])
     return [t for _, t in scored[:top_k]]
 
 def call_llm(prompt):
-    # Fake AI response
-    sentiment = random.choice(["Frustrated", "Upset", "Concerned"])
-    st.session_state.sentiment_history.append(sentiment)
-    return json.dumps({
-        "issue_summary": [
-            "The customer reports app crashes, lack of support response, and billing issues."
-        ],
-        "customer_sentiment": sentiment,
-        "draft_reply": (
-            "Dear Customer, we are investigating your issue. "
-            "Our support team is prioritizing the app crash, email response delays, and billing concerns. "
-            "We will follow up shortly with a resolution."
-        ),
-        "recommended_actions": [
-            "Investigate app crash",
-            "Respond to pending tickets",
-            "Resolve billing issue",
-            "Follow up with customers"
-        ]
-    })
+    try:
+        sentiment = random.choice(["Frustrated", "Upset", "Concerned"])
+        st.session_state.sentiment_history.append(sentiment)
+        return json.dumps({
+            "issue_summary": [
+                "The customer reports app crashes, lack of support response, and billing issues."
+            ],
+            "customer_sentiment": sentiment,
+            "draft_reply": (
+                "Dear Customer, we are investigating your issue. "
+                "Our support team is prioritizing the app crash, email response delays, and billing concerns. "
+                "We will follow up shortly with a resolution."
+            ),
+            "recommended_actions": [
+                "Investigate app crash",
+                "Respond to pending tickets",
+                "Resolve billing issue",
+                "Follow up with customers"
+            ]
+        })
+    except Exception as e:
+        return json.dumps({
+            "issue_summary": ["Error generating AI output."],
+            "customer_sentiment": "Unknown",
+            "draft_reply": str(e),
+            "recommended_actions": []
+        })
 
 # ------------------------
 # Streamlit UI
@@ -142,32 +148,48 @@ sample_issues = [
 ]
 selected_issue = st.selectbox("Or select a sample issue:", sample_issues)
 user_issue = st.text_input("Type a customer issue here (or edit selected):", selected_issue)
+user_issue = user_issue or "Sample issue"
 
+# ------------------------
+# Safe Run AI
+# ------------------------
 if st.button("Run AI"):
     st.info("Analyzing tickets and generating AI output...")
 
-    relevant_tickets = retrieve_relevant_tickets(user_issue, st.session_state.tickets)
+    try:
+        relevant_tickets = retrieve_relevant_tickets(user_issue, st.session_state.tickets)
+    except Exception as e:
+        st.error(f"Error retrieving tickets: {e}")
+        relevant_tickets = []
 
     col1, col2 = st.columns(2)
-
-    # --- Left: Relevant tickets ---
     with col1:
         st.subheader("🔍 Relevant Tickets")
-        for t in relevant_tickets:
-            color = status_colors.get(t["status"], "#E0E0E0")
-            st.markdown(
-                f"<div style='background-color:{color}; padding:12px; border-radius:6px; margin-bottom:8px'>"
-                f"<strong>{t['id']} - {t['customer']}</strong><br>{t['issue']}<br>Status: {t['status']}</div>",
-                unsafe_allow_html=True
-            )
+        if relevant_tickets:
+            for t in relevant_tickets:
+                color = status_colors.get(t["status"], "#E0E0E0")
+                st.markdown(
+                    f"<div style='background-color:{color}; padding:12px; border-radius:6px; margin-bottom:8px'>"
+                    f"<strong>{t['id']} - {t['customer']}</strong><br>{t['issue']}<br>Status: {t['status']}</div>",
+                    unsafe_allow_html=True
+                )
+        else:
+            st.info("No relevant tickets found.")
 
-    # --- Right: AI output ---
     with col2:
-        prompt = "\n".join([t["issue"] for t in relevant_tickets])
-        response = call_llm(prompt)
-        response_json = json.loads(response)
+        st.subheader("💬 AI Output")
 
-        st.subheader("💬 AI Summary / Draft Reply")
+        try:
+            response_json = json.loads(call_llm("\n".join([t["issue"] for t in relevant_tickets])))
+        except Exception as e:
+            response_json = {
+                "issue_summary": ["Error generating AI output."],
+                "customer_sentiment": "Unknown",
+                "draft_reply": str(e),
+                "recommended_actions": []
+            }
+
+        # --- Readable summary ---
         st.markdown(
             f"<div style='background-color:#E3F2FD; padding:12px; border-radius:6px'>"
             f"<strong>Issue Summary:</strong> {' '.join(response_json.get('issue_summary', []))}<br>"
@@ -188,15 +210,13 @@ if st.button("Run AI"):
             mime="application/json"
         )
 
-    st.markdown("---")
+    st.success("Analysis complete! You can update tickets or enter another issue to try again.")
 
-    # --- AI Sentiment Chart ---
-    st.subheader("📊 AI Customer Sentiment (Simulation)")
-    if st.session_state.sentiment_history:
-        sentiment_counts = pd.Series(st.session_state.sentiment_history).value_counts().reset_index()
-        sentiment_counts.columns = ["Sentiment", "Count"]
-        fig_sentiment = px.bar(sentiment_counts, x="Sentiment", y="Count", color="Sentiment",
-                               color_discrete_map={"Frustrated":"#EF5350","Upset":"#FFA726","Concerned":"#29B6F6"})
-        st.plotly_chart(fig_sentiment, use_container_width=True)
-
-    st.success("Demo complete! Update tickets above or enter another issue to try again.")
+# --- AI Sentiment Chart ---
+st.subheader("📊 AI Customer Sentiment (Simulation)")
+if st.session_state.sentiment_history:
+    sentiment_counts = pd.Series(st.session_state.sentiment_history).value_counts().reset_index()
+    sentiment_counts.columns = ["Sentiment", "Count"]
+    fig_sentiment = px.bar(sentiment_counts, x="Sentiment", y="Count", color="Sentiment",
+                           color_discrete_map={"Frustrated":"#EF5350","Upset":"#FFA726","Concerned":"#29B6F6"})
+    st.plotly_chart(fig_sentiment, use_container_width=True)
