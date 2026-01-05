@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 
 # ------------------------
-# Stateful ticket DB
+# Stateful tickets
 # ------------------------
 if "tickets" not in st.session_state:
     st.session_state.tickets = [
@@ -24,7 +24,9 @@ if "sentiment_history" not in st.session_state:
 # Fake embeddings / AI
 # ------------------------
 def embed(text):
-    # Fake embedding for demo
+    # Always return a fixed-length embedding
+    if not text:
+        return [0.0] * 768
     return [0.1] * 768
 
 def cosine_similarity(a, b):
@@ -37,12 +39,18 @@ def cosine_similarity(a, b):
 
 def retrieve_relevant_tickets(query, tickets, top_k=3):
     query_embedding = embed(query)
-    scored = [(cosine_similarity(query_embedding, embed(t["issue"])), t) for t in tickets]
+    scored = []
+    for t in tickets:
+        doc_embedding = embed(t["issue"])
+        if len(doc_embedding) != len(query_embedding):
+            doc_embedding = [0.0] * len(query_embedding)
+        score = cosine_similarity(query_embedding, doc_embedding)
+        scored.append((score, t))
     scored.sort(reverse=True)
     return [t for _, t in scored[:top_k]]
 
 def call_llm(prompt):
-    # Fake AI response for demo
+    # Fake AI response
     sentiment = random.choice(["Frustrated", "Upset", "Concerned"])
     st.session_state.sentiment_history.append(sentiment)
     return json.dumps({
@@ -80,9 +88,9 @@ pending_count = sum(1 for t in st.session_state.tickets if t["status"] == "Pendi
 resolved_count = sum(1 for t in st.session_state.tickets if t["status"] in ["Resolved", "Followed Up"])
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Open Tickets", open_count, delta=f"{open_count - 2}")
-col2.metric("Pending Tickets", pending_count, delta=f"{pending_count - 1}")
-col3.metric("Resolved / Followed Up", resolved_count, delta=f"{resolved_count - 0}")
+col1.metric("Open Tickets", open_count)
+col2.metric("Pending Tickets", pending_count)
+col3.metric("Resolved / Followed Up", resolved_count)
 
 st.markdown("---")
 
