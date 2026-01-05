@@ -30,23 +30,25 @@ def embed(text):
     return [0.1] * 768
 
 def cosine_similarity(a, b):
+    if not a or not b:
+        return 0.0
     dot = sum(x*y for x, y in zip(a, b))
     mag_a = math.sqrt(sum(x*x for x in a))
     mag_b = math.sqrt(sum(x*x for x in b))
     if mag_a == 0 or mag_b == 0:
-        return 0
+        return 0.0
     return dot / (mag_a * mag_b)
 
 def retrieve_relevant_tickets(query, tickets, top_k=3):
-    query_embedding = embed(query)
+    query_embedding = embed(query or "")
     scored = []
     for t in tickets:
-        doc_embedding = embed(t["issue"])
+        doc_embedding = embed(t.get("issue", "") or "")
         if len(doc_embedding) != len(query_embedding):
             doc_embedding = [0.0] * len(query_embedding)
         score = cosine_similarity(query_embedding, doc_embedding)
         scored.append((score, t))
-    scored.sort(reverse=True)
+    scored.sort(reverse=True, key=lambda x: x[0])  # sort by similarity
     return [t for _, t in scored[:top_k]]
 
 def call_llm(prompt):
